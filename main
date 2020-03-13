@@ -1,0 +1,53 @@
+#!/bin/bash
+
+cd "$(dirname "$0")" || exit $?
+
+# these are used by docker-compose.yml too
+export USER_ID="$(id -u)"
+export GROUP_ID="$(id -g)"
+
+if [ "$1" = 'stop' ]; then
+    exec docker-compose down --remove-orphans
+elif [ "$1" = 'destroy' ]; then
+    # this deletes the images too
+    exec docker-compose down --remove-orphans --rmi all
+elif [ "$1" = 'logs' ]; then
+    exec docker-compose logs --follow
+fi
+
+
+mkdir -p postgres
+
+
+postgres_dockerfile="postgres_user$USER_ID.dockerfile"
+if [ ! -f "$postgres_dockerfile" ]; then
+    (
+        echo "FROM postgres:alpine"
+        echo
+        echo "RUN echo \"user:x:$USER_ID:$GROUP_ID:User,,,:/home/user:/bin/bash\" >> /etc/passwd && \\"
+        echo '    echo "user:x:$USER_ID:" >> /etc/group'
+    ) >"$postgres_dockerfile"
+fi
+
+# docker compose up and docker-compose.yml doesn't have --rm
+# workarounds: https://serverfault.com/questions/750175/docker-compose-option-to-automaticaly-remove-container-after-run-in-docker-comp
+    # alternative method is "docker compose up" then "docker-compose down" after
+    # FIXME TRY THIS the pg_
+
+# THIS ERROR: Error: could not open file "global/pg_filenode.map": Permission denied
+# means that postgres is already running, kill it with: docker-compose down
+
+# run in the background
+docker-compose up -d
+# run in the foreground
+#exec docker-compose up
+
+# initialize keystone in the foreground with "docker-compose run"
+if [ ! -f keystone/initialized ]; then
+    echo "Initializing KeystoneJS."
+    echo "Stay tuned to answer interractive prompts."
+    echo "Important: choose the database adapter \"Knex\""
+    echo
+    #docker-compose run -e DATABASE_URL=postgres://postgres:password@postgres:5432/postgres --rm --service-ports -w /home/user keystone /home/user/main.sh
+    docker-compose run --rm keystone /home/user/main.sh init
+fi

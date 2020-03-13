@@ -1,0 +1,30 @@
+version: "3.7"
+services:
+    keystone:
+        image: node:latest
+        init: true
+        depends_on:
+            - postgres
+        links:
+            - postgres
+        ports:
+            - 3000:3000
+        volumes:
+            - ./keystone:/home/user:rw
+        user: "${USER_ID}:${GROUP_ID}"
+        working_dir: /home/user
+        command: /home/user/main.sh app
+        environment:
+            - DATABASE_URL=postgres://postgres:password@postgres:5432/postgres
+            - PORT=3000
+    postgres:
+        build:
+            context: .
+            dockerfile: "postgres_user${USER_ID}.dockerfile"
+        user: "${USER_ID}:${GROUP_ID}"
+        volumes:
+            - ./postgres:/var/lib/postgresql/data:rw
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=postgres
